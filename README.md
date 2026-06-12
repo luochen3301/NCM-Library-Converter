@@ -1,6 +1,6 @@
 # NCM 音乐库转换器
 
-![NCM Library Converter 界面示意](docs/readme-preview.svg)
+<img width="1304" height="861" alt="QQ_1781244089326" src="https://github.com/user-attachments/assets/87264902-a74f-489a-8029-ee1294ed3069" />
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/Desktop-PyQt6-41CD52)
