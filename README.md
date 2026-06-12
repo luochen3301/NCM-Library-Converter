@@ -149,7 +149,7 @@ V2.1 本地验证记录：
 ## 常见问题
 
 **这个项目和 lissettecarlr/ncmdump 是什么关系？**  
-本项目的 NCM 转换核心基于 [lissettecarlr/ncmdump](https://github.com/lissettecarlr/ncmdump)。你的项目主要是在其基础上扩展桌面端音乐库管理、状态持久化、批量队列和新版 UI。
+本项目的 NCM 转换核心基于 [lissettecarlr/ncmdump](https://github.com/lissettecarlr/ncmdump)。本项目主要是在其基础上扩展桌面端音乐库管理、状态持久化、批量队列和新版 UI。
 
 **转换后为什么不是 FLAC？**  
 工具不会转码，只会解密 NCM 内部已有的音频流。如果源文件内部是 MP3，输出就是 MP3。
