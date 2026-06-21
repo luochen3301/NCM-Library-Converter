@@ -1,0 +1,80 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">NCM Library Converter preview</title>
+  <desc id="desc">A product preview illustration for the NCM Library Converter desktop workflow.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1020"/>
+      <stop offset="0.54" stop-color="#111827"/>
+      <stop offset="1" stop-color="#052E2B"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="72" y1="82" x2="1208" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#151B2E"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <filter id="shadow" x="24" y="42" width="1232" height="660" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="18"/>
+      <feGaussianBlur stdDeviation="24"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.34 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <rect x="72" y="70" width="1136" height="580" rx="28" fill="url(#panel)" stroke="#263244"/>
+    <rect x="72" y="70" width="244" height="580" rx="28" fill="#0A0F1D"/>
+    <path d="M316 70H344V650H316V70Z" fill="#10192B"/>
+    <circle cx="124" cy="123" r="19" fill="#35C2A4"/>
+    <text x="158" y="117" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700">NCM Library</text>
+    <text x="158" y="143" fill="#8EA3B8" font-family="Segoe UI, Arial, sans-serif" font-size="14">Converter V2.2</text>
+    <rect x="104" y="190" width="176" height="42" rx="10" fill="#132138"/>
+    <text x="132" y="217" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="16">音乐库</text>
+    <rect x="104" y="247" width="176" height="42" rx="10" fill="#0A0F1D"/>
+    <text x="132" y="274" fill="#A8B4C5" font-family="Segoe UI, Arial, sans-serif" font-size="16">语言分类</text>
+    <rect x="104" y="304" width="176" height="42" rx="10" fill="#0A0F1D"/>
+    <text x="132" y="331" fill="#A8B4C5" font-family="Segoe UI, Arial, sans-serif" font-size="16">转换队列</text>
+    <rect x="104" y="361" width="176" height="42" rx="10" fill="#0A0F1D"/>
+    <text x="132" y="388" fill="#A8B4C5" font-family="Segoe UI, Arial, sans-serif" font-size="16">历史日志</text>
+    <rect x="104" y="418" width="176" height="42" rx="10" fill="#0A0F1D"/>
+    <text x="132" y="445" fill="#A8B4C5" font-family="Segoe UI, Arial, sans-serif" font-size="16">设置</text>
+    <rect x="102" y="575" width="178" height="38" rx="10" fill="#132138" stroke="#243249"/>
+    <text x="125" y="600" fill="#8EA3B8" font-family="Segoe UI, Arial, sans-serif" font-size="14">本地 SQLite 状态</text>
+    <text x="372" y="130" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800">NCM 音乐库转换器</text>
+    <text x="374" y="164" fill="#A8B4C5" font-family="Segoe UI, Arial, sans-serif" font-size="17">扫描音乐库，记住转换状态，只处理仍需转换的 .ncm 文件。</text>
+    <rect x="988" y="112" width="138" height="44" rx="12" fill="#35C2A4"/>
+    <text x="1019" y="140" fill="#052E2B" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">转换待处理</text>
+    <rect x="374" y="204" width="174" height="110" rx="18" fill="#0D1628" stroke="#25314A"/>
+    <text x="398" y="244" fill="#35C2A4" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800">128</text>
+    <text x="398" y="276" fill="#C9D5E4" font-family="Segoe UI, Arial, sans-serif" font-size="16">待转换</text>
+    <rect x="572" y="204" width="174" height="110" rx="18" fill="#0D1628" stroke="#25314A"/>
+    <text x="596" y="244" fill="#60A5FA" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800">924</text>
+    <text x="596" y="276" fill="#C9D5E4" font-family="Segoe UI, Arial, sans-serif" font-size="16">已转换</text>
+    <rect x="770" y="204" width="174" height="110" rx="18" fill="#0D1628" stroke="#25314A"/>
+    <text x="794" y="244" fill="#FBBF24" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800">36</text>
+    <text x="794" y="276" fill="#C9D5E4" font-family="Segoe UI, Arial, sans-serif" font-size="16">普通音频</text>
+    <rect x="968" y="204" width="174" height="110" rx="18" fill="#0D1628" stroke="#25314A"/>
+    <text x="992" y="244" fill="#F87171" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800">4</text>
+    <text x="992" y="276" fill="#C9D5E4" font-family="Segoe UI, Arial, sans-serif" font-size="16">需要处理</text>
+    <rect x="374" y="348" width="768" height="224" rx="20" fill="#0D1628" stroke="#25314A"/>
+    <text x="402" y="391" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">转换队列</text>
+    <text x="1032" y="391" fill="#8EA3B8" font-family="Segoe UI, Arial, sans-serif" font-size="14">3 个任务运行中</text>
+    <rect x="402" y="421" width="712" height="1" fill="#25314A"/>
+    <g font-family="Segoe UI, Arial, sans-serif" font-size="15">
+      <text x="402" y="460" fill="#D7E2F0">/Music/华语/track-01.ncm</text>
+      <rect x="872" y="442" width="160" height="10" rx="5" fill="#1E293B"/>
+      <rect x="872" y="442" width="116" height="10" rx="5" fill="#35C2A4"/>
+      <text x="1052" y="460" fill="#A8B4C5">72%</text>
+      <text x="402" y="505" fill="#D7E2F0">/Music/English/track-02.ncm</text>
+      <rect x="872" y="487" width="160" height="10" rx="5" fill="#1E293B"/>
+      <rect x="872" y="487" width="74" height="10" rx="5" fill="#60A5FA"/>
+      <text x="1052" y="505" fill="#A8B4C5">46%</text>
+      <text x="402" y="550" fill="#D7E2F0">/Music/Japan/track-03.ncm</text>
+      <rect x="872" y="532" width="160" height="10" rx="5" fill="#1E293B"/>
+      <rect x="872" y="532" width="35" height="10" rx="5" fill="#FBBF24"/>
+      <text x="1052" y="550" fill="#A8B4C5">22%</text>
+    </g>
+  </g>
+</svg>

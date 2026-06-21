@@ -133,6 +133,23 @@ class LibraryServiceTests(unittest.TestCase):
         model.toggle_row_checked(0)
         self.assertEqual(model.checked_records(), [])
 
+    def test_failure_group_key_classifies_common_errors(self):
+        from gui import MainWindow
+
+        cases = {
+            "No permission to read the source or write the output file.": "permission",
+            "The output folder is unavailable.": "output",
+            "File does not exist or was moved.": "missing",
+            "Not enough disk space for the output file.": "disk",
+            "The file is currently in use by another application.": "busy",
+            "The file path is too long for this system.": "path",
+            "NCM metadata parsing failed.": "format",
+            "Unexpected conversion failure.": "other",
+        }
+        for message, expected in cases.items():
+            with self.subTest(message=message):
+                self.assertEqual(MainWindow._failure_group_key(None, message), expected)
+
     def test_scan_statuses_ignore_and_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "music"

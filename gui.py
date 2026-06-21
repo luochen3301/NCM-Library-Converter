@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -565,6 +566,95 @@ class EmptyState(QFrame):
             self.primary_button.setText(primary_label)
 
 
+class OnboardingPanel(QFrame):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("onboardingPanel")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(34, 30, 34, 30)
+        layout.setSpacing(20)
+
+        hero = QVBoxLayout()
+        hero.setContentsMargins(0, 0, 0, 0)
+        hero.setSpacing(10)
+        hero.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label = QLabel("NCM")
+        self.icon_label.setObjectName("emptyIcon")
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label = QLabel()
+        self.title_label.setObjectName("emptyTitle")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.description_label = QLabel()
+        self.description_label.setObjectName("emptyDescription")
+        self.description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.description_label.setWordWrap(True)
+        hero.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignCenter)
+        hero.addWidget(self.title_label)
+        hero.addWidget(self.description_label)
+        layout.addLayout(hero)
+
+        self.step_cards: list[tuple[QLabel, QLabel, QLabel]] = []
+        steps_host = QWidget()
+        steps_layout = FlowLayout(steps_host, spacing=12)
+        steps_layout.setContentsMargins(0, 0, 0, 0)
+        for _ in range(3):
+            card = QFrame()
+            card.setObjectName("onboardingStep")
+            card.setMinimumSize(190, 112)
+            card.setMaximumWidth(250)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(16, 14, 16, 14)
+            card_layout.setSpacing(8)
+            number = QLabel()
+            number.setObjectName("stepNumber")
+            title = QLabel()
+            title.setObjectName("stepTitle")
+            title.setWordWrap(True)
+            body = QLabel()
+            body.setObjectName("stepBody")
+            body.setWordWrap(True)
+            card_layout.addWidget(number)
+            card_layout.addWidget(title)
+            card_layout.addWidget(body)
+            steps_layout.addWidget(card)
+            self.step_cards.append((number, title, body))
+        layout.addWidget(steps_host)
+
+        actions = FlowLayout(spacing=10)
+        self.choose_button = QPushButton()
+        self.choose_button.setObjectName("primaryButton")
+        self.settings_button = QPushButton()
+        self.settings_button.setProperty("variant", "secondary")
+        self.scan_button = QPushButton()
+        self.scan_button.setProperty("variant", "ghost")
+        actions.addWidget(self.choose_button)
+        actions.addWidget(self.settings_button)
+        actions.addWidget(self.scan_button)
+        layout.addLayout(actions)
+
+    def set_texts(
+        self,
+        icon: str,
+        title: str,
+        description: str,
+        choose_label: str,
+        settings_label: str,
+        scan_label: str,
+        steps: list[tuple[str, str, str]],
+    ) -> None:
+        self.icon_label.setText(icon)
+        self.title_label.setText(title)
+        self.description_label.setText(description)
+        self.choose_button.setText(choose_label)
+        self.settings_button.setText(settings_label)
+        self.scan_button.setText(scan_label)
+        for labels, values in zip(self.step_cards, steps):
+            number, step_title, body = labels
+            number.setText(values[0])
+            step_title.setText(values[1])
+            body.setText(values[2])
+
+
 class ToggleSwitch(QCheckBox):
     def __init__(self, text: str = ""):
         super().__init__(text)
@@ -729,6 +819,96 @@ class ProgressPanel(QFrame):
         self.metrics_label.setText(metrics)
 
 
+class ConversionSummaryPanel(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("conversionSummary")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
+
+        header = QHBoxLayout()
+        text = QVBoxLayout()
+        text.setContentsMargins(0, 0, 0, 0)
+        self.title_label = QLabel()
+        self.title_label.setObjectName("summaryTitle")
+        self.detail_label = QLabel()
+        self.detail_label.setObjectName("summaryDetail")
+        self.detail_label.setWordWrap(True)
+        text.addWidget(self.title_label)
+        text.addWidget(self.detail_label)
+        header.addLayout(text, 1)
+        self.close_button = QPushButton()
+        self.close_button.setProperty("variant", "ghost")
+        header.addWidget(self.close_button)
+        layout.addLayout(header)
+
+        metrics_host = QWidget()
+        metrics_layout = FlowLayout(metrics_host, spacing=10)
+        metrics_layout.setContentsMargins(0, 0, 0, 0)
+        self.metric_labels: dict[str, QLabel] = {}
+        for key in ("success", "failed", "skipped", "duration", "output"):
+            card = QFrame()
+            card.setObjectName("summaryMetric")
+            card.setMinimumWidth(128)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 10)
+            card_layout.setSpacing(4)
+            label = QLabel()
+            label.setObjectName("summaryMetricLabel")
+            value = QLabel()
+            value.setObjectName("summaryMetricValue")
+            value.setWordWrap(True)
+            card_layout.addWidget(label)
+            card_layout.addWidget(value)
+            metrics_layout.addWidget(card)
+            self.metric_labels[f"{key}.label"] = label
+            self.metric_labels[f"{key}.value"] = value
+        layout.addWidget(metrics_host)
+
+        actions = FlowLayout(spacing=10)
+        self.open_output_button = QPushButton()
+        self.open_output_button.setProperty("variant", "secondary")
+        self.retry_failed_button = QPushButton()
+        self.retry_failed_button.setObjectName("primaryButton")
+        self.export_logs_button = QPushButton()
+        self.export_logs_button.setProperty("variant", "secondary")
+        actions.addWidget(self.open_output_button)
+        actions.addWidget(self.retry_failed_button)
+        actions.addWidget(self.export_logs_button)
+        layout.addLayout(actions)
+
+    def set_labels(self, labels: dict[str, str]) -> None:
+        self.title_label.setText(labels["title"])
+        self.close_button.setText(labels["close"])
+        self.open_output_button.setText(labels["open_output"])
+        self.retry_failed_button.setText(labels["retry_failed"])
+        self.export_logs_button.setText(labels["export_logs"])
+        for key in ("success", "failed", "skipped", "duration", "output"):
+            self.metric_labels[f"{key}.label"].setText(labels[f"{key}.label"])
+
+    def set_summary(
+        self,
+        detail: str,
+        success: int,
+        failed: int,
+        skipped: int,
+        duration: str,
+        output: str,
+    ) -> None:
+        self.detail_label.setText(detail)
+        values = {
+            "success": str(success),
+            "failed": str(failed),
+            "skipped": str(skipped),
+            "duration": duration,
+            "output": output,
+        }
+        for key, value in values.items():
+            self.metric_labels[f"{key}.value"].setText(value)
+            self.metric_labels[f"{key}.value"].setToolTip(value)
+
+
 class FileTableModel(QAbstractTableModel):
     checked_changed = pyqtSignal()
 
@@ -851,6 +1031,10 @@ class FileTableModel(QAbstractTableModel):
                     return "◩"
                 return "☐"
             return self.header_labels[section]
+        if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
+            if section == 0:
+                return "Select visible rows"
+            return self.header_labels[section]
         if role == Qt.ItemDataRole.CheckStateRole and orientation == Qt.Orientation.Horizontal and section == 0:
             return self.visible_check_state()
         return None
@@ -892,6 +1076,13 @@ class FileTableModel(QAbstractTableModel):
                 return record.failure_reason
         if role == Qt.ItemDataRole.TextAlignmentRole and column in {0, 2, 3, 4, 5}:
             return Qt.AlignmentFlag.AlignCenter
+        if role == Qt.ItemDataRole.ForegroundRole:
+            if record.status == FileStatus.FAILED.value:
+                return QBrush(QColor("#fb7185" if self.theme == "obsidian" else "#ef4444"))
+            if record.status == FileStatus.MISSING.value:
+                return QBrush(QColor("#fbbf24" if self.theme == "obsidian" else "#d97706"))
+            if column == 6 and record.output_path:
+                return QBrush(QColor("#9fb0ff" if self.theme == "obsidian" else "#2563eb"))
         if role == Qt.ItemDataRole.BackgroundRole:
             if record.id in self.checked_ids:
                 if self.theme == "light":
@@ -1367,6 +1558,8 @@ class MainWindow(QMainWindow):
         self.context_record: FileRecord | None = None
         self.queue_paused = False
         self.queue_failed_count = 0
+        self.failed_group_records: dict[str, list[FileRecord]] = {}
+        self.conversion_started_at = 0.0
         self.settings_recently_saved = False
         self.watcher = QFileSystemWatcher(self)
         self.watch_timer = QTimer(self)
@@ -1409,6 +1602,13 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._build_top_bar())
         self.progress_panel = ProgressPanel()
         content_layout.addWidget(self.progress_panel)
+        self.conversion_summary = ConversionSummaryPanel()
+        self.conversion_summary.open_output_button.clicked.connect(self._open_conversion_output_location)
+        self.conversion_summary.retry_failed_button.clicked.connect(self.retry_all_failed)
+        self.conversion_summary.export_logs_button.clicked.connect(self.export_logs)
+        self.conversion_summary.close_button.clicked.connect(self.conversion_summary.hide)
+        self.conversion_summary.hide()
+        content_layout.addWidget(self.conversion_summary)
 
         self.pages = QStackedWidget()
         self.pages.setObjectName("pages")
@@ -1549,13 +1749,10 @@ class MainWindow(QMainWindow):
     def _build_library_page(self) -> QWidget:
         self.library_stack = QStackedWidget()
 
-        self.onboarding_state = EmptyState(
-            self._tr("onboarding.icon"),
-            self._tr("onboarding.title"),
-            self._tr("onboarding.description"),
-            self._tr("onboarding.primary"),
-        )
-        self.onboarding_state.primary_button.clicked.connect(self.change_folder)
+        self.onboarding_state = OnboardingPanel()
+        self.onboarding_state.choose_button.clicked.connect(self.change_folder)
+        self.onboarding_state.settings_button.clicked.connect(lambda: self.sidebar.setCurrentRow(self.sidebar_nav_keys.index("settings")))
+        self.onboarding_state.scan_button.clicked.connect(self.change_folder)
         self.library_stack.addWidget(self.onboarding_state)
 
         content = QWidget()
@@ -1844,6 +2041,35 @@ class MainWindow(QMainWindow):
             summary_layout.addWidget(button)
         layout.addWidget(self.queue_summary)
 
+        self.failure_groups = QFrame()
+        self.failure_groups.setObjectName("failureGroups")
+        failure_layout = QVBoxLayout(self.failure_groups)
+        failure_layout.setContentsMargins(16, 14, 16, 14)
+        failure_layout.setSpacing(10)
+        failure_header = QHBoxLayout()
+        failure_text = QVBoxLayout()
+        failure_text.setContentsMargins(0, 0, 0, 0)
+        self.failure_groups_title = QLabel(self._tr("failureGroups.title"))
+        self.failure_groups_title.setObjectName("failureGroupsTitle")
+        self.failure_groups_detail = QLabel(self._tr("failureGroups.detail"))
+        self.failure_groups_detail.setObjectName("failureGroupsDetail")
+        self.failure_groups_detail.setWordWrap(True)
+        failure_text.addWidget(self.failure_groups_title)
+        failure_text.addWidget(self.failure_groups_detail)
+        failure_header.addLayout(failure_text, 1)
+        self.failure_groups_copy_all = QPushButton(self._tr("failureGroups.copyAll"))
+        self.failure_groups_copy_all.setProperty("variant", "secondary")
+        self.failure_groups_copy_all.clicked.connect(self._copy_all_failed_issues)
+        failure_header.addWidget(self.failure_groups_copy_all)
+        failure_layout.addLayout(failure_header)
+        self.failure_groups_rows = QWidget()
+        self.failure_groups_rows_layout = QVBoxLayout(self.failure_groups_rows)
+        self.failure_groups_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self.failure_groups_rows_layout.setSpacing(8)
+        failure_layout.addWidget(self.failure_groups_rows)
+        self.failure_groups.hide()
+        layout.addWidget(self.failure_groups)
+
         self.queue_stack = QStackedWidget()
         self.queue_empty_state = EmptyState(
             "Queue",
@@ -2120,6 +2346,7 @@ class MainWindow(QMainWindow):
         row_height = 54 if self.settings.density == "compact" else 64
         table.verticalHeader().setDefaultSectionSize(row_height)
         table.horizontalHeader().setHighlightSections(False)
+        table.horizontalHeader().setSortIndicatorShown(True)
         table.horizontalHeader().setStretchLastSection(False)
         table.horizontalHeader().setFixedHeight(42)
         table.horizontalHeader().setMinimumSectionSize(36)
@@ -2160,6 +2387,7 @@ class MainWindow(QMainWindow):
         row_height = 54 if self.settings.density == "compact" else 64
         table.verticalHeader().setDefaultSectionSize(row_height)
         table.horizontalHeader().setHighlightSections(False)
+        table.horizontalHeader().setSortIndicatorShown(True)
         table.horizontalHeader().setStretchLastSection(False)
         table.horizontalHeader().setFixedHeight(42)
         table.horizontalHeader().setMinimumSectionSize(54)
@@ -2614,6 +2842,8 @@ class MainWindow(QMainWindow):
         self.conversion_thread.finished.connect(self._update_queue_actions)
         self.conversion_thread.finished.connect(self._update_batch_bar)
         self.progress_panel.set_progress(0, self._tr("progress.startingConversion"), self._tr("progress.preparingQueue"))
+        self.conversion_summary.hide()
+        self.conversion_started_at = time.monotonic()
         self.top_status_label.setText(self._tr("progress.converting"))
         self.queue_paused = False
         self._update_queue_actions()
@@ -2636,6 +2866,20 @@ class MainWindow(QMainWindow):
         self.top_status_label.setText(self._tr("top.ready"))
         self.queue_paused = False
         self.refresh_all()
+        skipped = max(0, progress.total - progress.success - progress.failed)
+        duration = self._format_duration(time.monotonic() - self.conversion_started_at if self.conversion_started_at else 0)
+        output_location = self._conversion_output_location_text()
+        detail_key = "summary.detailCanceled" if progress.canceled else "summary.detail"
+        self.conversion_summary.set_summary(
+            self._tr(detail_key, total=progress.total),
+            progress.success,
+            progress.failed,
+            skipped,
+            duration,
+            output_location,
+        )
+        self.conversion_summary.retry_failed_button.setEnabled(bool(progress.failed and self.library_id))
+        self.conversion_summary.show()
         level = "warning" if progress.failed or progress.canceled else "success"
         self.show_toast(self._tr("toast.conversionFinished", metrics=metrics), level)
 
@@ -2648,6 +2892,29 @@ class MainWindow(QMainWindow):
         self.show_toast(message, "error")
         self._show_dialog(self._tr("dialog.conversionFailed.title"), message, "error")
         self.refresh_all()
+
+    def _format_duration(self, seconds: float) -> str:
+        seconds = max(0.0, seconds)
+        if seconds < 60:
+            return self._tr("summary.durationSeconds", seconds=int(seconds))
+        minutes = int(seconds // 60)
+        remainder = int(seconds % 60)
+        return self._tr("summary.durationMinutes", minutes=minutes, seconds=remainder)
+
+    def _conversion_output_location_text(self) -> str:
+        if self.settings.output_location == "custom_folder" and self.settings.custom_output_folder:
+            return self.settings.custom_output_folder
+        return self._tr("summary.outputSameFolder")
+
+    def _open_conversion_output_location(self) -> None:
+        if self.settings.output_location == "custom_folder" and self.settings.custom_output_folder:
+            folder = Path(self.settings.custom_output_folder)
+        elif self.settings.music_library_path:
+            folder = Path(self.settings.music_library_path)
+        else:
+            self.show_toast(self._tr("toast.noOutput"), "warning")
+            return
+        self._open_folder(folder)
 
     def pause_conversion(self) -> None:
         if self.conversion_worker:
@@ -2709,14 +2976,17 @@ class MainWindow(QMainWindow):
         output_exists = bool(target and target.output_path and Path(target.output_path).is_file())
         has_records = bool(records)
         menu = QMenu(self)
+        menu.addSection(self._tr("menu.section.actions"))
         convert = menu.addAction(self._tr("menu.convert"))
         retry = menu.addAction(self._tr("menu.retryFailed"))
+        menu.addSection(self._tr("menu.section.status"))
         ignore = menu.addAction(self._tr("menu.ignore"))
         unignore = menu.addAction(self._tr("menu.unignore"))
-        menu.addSeparator()
+        menu.addSection(self._tr("menu.section.open"))
         reveal_source = menu.addAction(self._tr("menu.openSourceFolder"))
         reveal_output = menu.addAction(self._tr("menu.revealOutput"))
         open_output = menu.addAction(self._tr("menu.openOutput"))
+        menu.addSection(self._tr("menu.section.copy"))
         copy_source = menu.addAction(self._tr("menu.copySource"))
         copy_output = menu.addAction(self._tr("menu.copyOutput"))
         convert.setEnabled(has_records and not self.conversion_worker)
@@ -2761,14 +3031,17 @@ class MainWindow(QMainWindow):
         has_records = bool(records)
 
         menu = QMenu(self)
+        menu.addSection(self._tr("menu.section.actions"))
         convert = menu.addAction(self._tr("menu.convert"))
         retry = menu.addAction(self._tr("menu.retryFailed"))
+        menu.addSection(self._tr("menu.section.status"))
         ignore = menu.addAction(self._tr("menu.ignore"))
         unignore = menu.addAction(self._tr("menu.unignore"))
-        menu.addSeparator()
+        menu.addSection(self._tr("menu.section.open"))
         reveal_source = menu.addAction(self._tr("menu.openSourceFolder"))
         reveal_output = menu.addAction(self._tr("menu.revealOutput"))
         open_output = menu.addAction(self._tr("menu.openOutput"))
+        menu.addSection(self._tr("menu.section.copy"))
         copy_source = menu.addAction(self._tr("menu.copySource"))
         copy_output = menu.addAction(self._tr("menu.copyOutput"))
         convert.setEnabled(has_records and not self.conversion_worker)
@@ -2813,14 +3086,17 @@ class MainWindow(QMainWindow):
         has_records = bool(records)
 
         menu = QMenu(self)
+        menu.addSection(self._tr("menu.section.actions"))
         convert = menu.addAction(self._tr("menu.convert"))
         retry = menu.addAction(self._tr("menu.retryFailed"))
+        menu.addSection(self._tr("menu.section.status"))
         ignore = menu.addAction(self._tr("menu.ignore"))
         unignore = menu.addAction(self._tr("menu.unignore"))
-        menu.addSeparator()
+        menu.addSection(self._tr("menu.section.open"))
         reveal_source = menu.addAction(self._tr("menu.openSourceFolder"))
         reveal_output = menu.addAction(self._tr("menu.revealOutput"))
         open_output = menu.addAction(self._tr("menu.openOutput"))
+        menu.addSection(self._tr("menu.section.copy"))
         copy_source = menu.addAction(self._tr("menu.copySource"))
         copy_output = menu.addAction(self._tr("menu.copyOutput"))
         convert.setEnabled(
@@ -3045,6 +3321,8 @@ class MainWindow(QMainWindow):
             self.queue_model.set_records([])
             self.queue_stack.setCurrentIndex(0)
             self.queue_failed_count = 0
+            self.failed_group_records = {}
+            self.failure_groups.hide()
             self._update_queue_actions()
             return
         pending = self.db.list_files(self.library_id, status=FileStatus.PENDING.value)
@@ -3054,7 +3332,101 @@ class MainWindow(QMainWindow):
         self.queue_model.set_records(records)
         self.queue_stack.setCurrentIndex(1 if records else 0)
         self.queue_detail.setText(self._tr("queue.summary", pending=len(pending), failed=len(failed)))
+        self._refresh_failure_groups(failed)
         self._update_queue_actions()
+
+    def _refresh_failure_groups(self, failed_records: list[FileRecord]) -> None:
+        self._clear_layout(self.failure_groups_rows_layout)
+        self.failed_group_records = {}
+        if not failed_records:
+            self.failure_groups.hide()
+            return
+        for record in failed_records:
+            key = self._failure_group_key(record.failure_reason)
+            self.failed_group_records.setdefault(key, []).append(record)
+        for key, records in sorted(self.failed_group_records.items(), key=lambda item: len(item[1]), reverse=True):
+            row = QFrame()
+            row.setObjectName("failureGroupRow")
+            row_layout = FlowLayout(row, spacing=8)
+            row_layout.setContentsMargins(10, 8, 10, 8)
+            title = QLabel(self._tr(f"failureGroups.{key}"))
+            title.setObjectName("failureGroupTitle")
+            detail = QLabel(self._tr("failureGroups.count", count=len(records)))
+            detail.setObjectName("failureGroupDetail")
+            sample = QLabel(records[0].failure_reason or self._tr("failureGroups.noMessage"))
+            sample.setObjectName("failureGroupSample")
+            sample.setWordWrap(True)
+            sample.setToolTip(sample.text())
+            copy_button = QPushButton(self._tr("failureGroups.copy"))
+            copy_button.setProperty("variant", "secondary")
+            retry_button = QPushButton(self._tr("failureGroups.retry"))
+            retry_button.setObjectName("primaryButton")
+            reveal_button = QPushButton(self._tr("failureGroups.reveal"))
+            reveal_button.setProperty("variant", "ghost")
+            copy_button.clicked.connect(lambda _=False, group=key: self._copy_failed_group(group))
+            retry_button.clicked.connect(lambda _=False, group=key: self._retry_failed_group(group))
+            reveal_button.clicked.connect(lambda _=False, group=key: self._reveal_failed_group(group))
+            row_layout.addWidget(title)
+            row_layout.addWidget(detail)
+            row_layout.addWidget(sample)
+            row_layout.addWidget(copy_button)
+            row_layout.addWidget(retry_button)
+            row_layout.addWidget(reveal_button)
+            self.failure_groups_rows_layout.addWidget(row)
+        self.failure_groups.show()
+
+    def _clear_layout(self, layout: QLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            child_layout = item.layout()
+            if widget:
+                widget.deleteLater()
+            elif child_layout:
+                self._clear_layout(child_layout)
+
+    def _failure_group_key(self, message: str) -> str:
+        lowered = (message or "").lower()
+        if any(token in lowered for token in ("permission", "access", "denied")):
+            return "permission"
+        if "output folder" in lowered or "output" in lowered and "unavailable" in lowered:
+            return "output"
+        if any(token in lowered for token in ("does not exist", "not found", "moved", "no such file", "cannot find")):
+            return "missing"
+        if any(token in lowered for token in ("disk", "space", "full")):
+            return "disk"
+        if any(token in lowered for token in ("in use", "being used")):
+            return "busy"
+        if any(token in lowered for token in ("path too long", "too long", "file name", "filename", "invalid")):
+            return "path"
+        if any(token in lowered for token in ("format", "header", "decrypt", "metadata", "ncm")):
+            return "format"
+        return "other"
+
+    def _copy_failed_group(self, group: str) -> None:
+        records = self.failed_group_records.get(group, [])
+        if not records:
+            return
+        text = "\n".join(f"{record.relative_path}: {record.failure_reason}" for record in records)
+        QApplication.clipboard().setText(text)
+        self.show_toast(self._tr("toast.copiedIssues", count=len(records)), "success")
+
+    def _copy_all_failed_issues(self) -> None:
+        records = [record for group in self.failed_group_records.values() for record in group]
+        if not records:
+            return
+        text = "\n".join(f"{record.relative_path}: {record.failure_reason}" for record in records)
+        QApplication.clipboard().setText(text)
+        self.show_toast(self._tr("toast.copiedIssues", count=len(records)), "success")
+
+    def _retry_failed_group(self, group: str) -> None:
+        self._retry_records(self.failed_group_records.get(group, []))
+
+    def _reveal_failed_group(self, group: str) -> None:
+        records = self.failed_group_records.get(group, [])
+        if not records:
+            return
+        self._open_folder(Path(records[0].absolute_path).parent)
 
     def refresh_stats(self) -> None:
         if not self.library_id:
@@ -3180,14 +3552,19 @@ class MainWindow(QMainWindow):
         output_path = row["output_path"] or ""
         output_exists = bool(output_path and Path(output_path).is_file())
         menu = QMenu(self)
+        menu.addSection(self._tr("menu.section.open"))
         open_output = menu.addAction(self._tr("menu.openOutput"))
         reveal_output = menu.addAction(self._tr("menu.revealOutput"))
+        menu.addSection(self._tr("menu.section.copy"))
         copy_source = menu.addAction(self._tr("menu.copySource"))
         copy_output = menu.addAction(self._tr("menu.copyOutput"))
+        copy_issue = menu.addAction(self._tr("menu.copyIssue"))
+        menu.addSection(self._tr("menu.section.actions"))
         retry = menu.addAction(self._tr("menu.retryFailed"))
         open_output.setEnabled(output_exists)
         reveal_output.setEnabled(output_exists)
         copy_output.setEnabled(bool(output_path))
+        copy_issue.setEnabled(bool(row["error_message"]))
         retry.setEnabled(row["status"] == "failed" and row["file_id"] is not None)
         action = menu.exec(self.history_table.viewport().mapToGlobal(point))
         if action == open_output:
@@ -3202,6 +3579,9 @@ class MainWindow(QMainWindow):
         elif action == copy_output:
             QApplication.clipboard().setText(output_path)
             self.show_toast(self._tr("toast.copiedOutput", count=1), "success")
+        elif action == copy_issue:
+            QApplication.clipboard().setText(row["error_message"] or "")
+            self.show_toast(self._tr("toast.copiedIssues", count=1), "success")
         elif action == retry:
             self.db.update_file_status(int(row["file_id"]), FileStatus.PENDING.value, failure_reason="")
             self.refresh_all()
@@ -3371,7 +3751,26 @@ class MainWindow(QMainWindow):
             self._tr("onboarding.title"),
             self._tr("onboarding.description"),
             self._tr("onboarding.primary"),
+            self._tr("onboarding.settings"),
+            self._tr("onboarding.scan"),
+            [
+                (self._tr("onboarding.step1.number"), self._tr("onboarding.step1.title"), self._tr("onboarding.step1.body")),
+                (self._tr("onboarding.step2.number"), self._tr("onboarding.step2.title"), self._tr("onboarding.step2.body")),
+                (self._tr("onboarding.step3.number"), self._tr("onboarding.step3.title"), self._tr("onboarding.step3.body")),
+            ],
         )
+        self.conversion_summary.set_labels({
+            "title": self._tr("summary.title"),
+            "close": self._tr("summary.close"),
+            "open_output": self._tr("summary.openOutput"),
+            "retry_failed": self._tr("summary.retryFailed"),
+            "export_logs": self._tr("summary.exportLogs"),
+            "success.label": self._tr("summary.success"),
+            "failed.label": self._tr("summary.failed"),
+            "skipped.label": self._tr("summary.skipped"),
+            "duration.label": self._tr("summary.duration"),
+            "output.label": self._tr("summary.output"),
+        })
         for key, (title_key, icon_key, description_key) in self.stat_card_keys.items():
             self.stat_cards[key].set_texts(self._tr(title_key), self._tr(icon_key), self._tr(description_key))
 
@@ -3437,6 +3836,9 @@ class MainWindow(QMainWindow):
 
         if not self.conversion_worker:
             self.queue_status.setText(self._tr("queue.title"))
+        self.failure_groups_title.setText(self._tr("failureGroups.title"))
+        self.failure_groups_detail.setText(self._tr("failureGroups.detail"))
+        self.failure_groups_copy_all.setText(self._tr("failureGroups.copyAll"))
         self.queue_empty_state.set_texts(
             self._tr("queue.empty.icon"),
             self._tr("queue.empty.title"),
@@ -3731,7 +4133,7 @@ class MainWindow(QMainWindow):
                 font-size: 16px;
                 font-weight: 700;
             }}
-            #appSubtitle, #sidebarStatus, #settingHelper, #settingsSectionDescription, #statDescription, #queueDetail, #progressDetail, #progressMetrics, #resultCount, #languageDescription {{
+            #appSubtitle, #sidebarStatus, #settingHelper, #settingsSectionDescription, #statDescription, #queueDetail, #progressDetail, #progressMetrics, #resultCount, #languageDescription, #summaryDetail, #summaryMetricLabel, #failureGroupsDetail, #failureGroupDetail, #failureGroupSample, #stepBody {{
                 color: {palette.muted};
             }}
             #sidebar {{
@@ -3775,7 +4177,7 @@ class MainWindow(QMainWindow):
                 color: {palette.muted};
                 font-weight: 700;
             }}
-            #progressPanel, #queueSummary, #filterBar, #batchBar, #emptyState, #settingsSection, #languageHero {{
+            #progressPanel, #queueSummary, #filterBar, #batchBar, #emptyState, #onboardingPanel, #conversionSummary, #failureGroups, #settingsSection, #languageHero {{
                 background: {palette.surface};
                 border: 1px solid {palette.border};
                 border-radius: 14px;
@@ -3800,7 +4202,7 @@ class MainWindow(QMainWindow):
                 background: transparent;
                 border: 0;
             }}
-            #progressTitle, #queueTitle, #emptyTitle, #settingsSectionTitle, #languageTitle {{
+            #progressTitle, #queueTitle, #emptyTitle, #settingsSectionTitle, #languageTitle, #summaryTitle, #failureGroupsTitle, #stepTitle {{
                 font-size: 17px;
                 font-weight: 700;
             }}
@@ -3848,6 +4250,28 @@ class MainWindow(QMainWindow):
                 font-size: 30px;
                 font-weight: 800;
                 color: {palette.text};
+            }}
+            #onboardingStep, #summaryMetric, #failureGroupRow {{
+                background: {palette.surface_alt};
+                border: 1px solid {palette.border};
+                border-radius: 12px;
+            }}
+            #onboardingStep:hover, #failureGroupRow:hover {{
+                background: {palette.elevated};
+                border-color: {palette.strong_border};
+            }}
+            #stepNumber {{
+                color: {palette.primary};
+                font-weight: 800;
+            }}
+            #summaryMetricValue {{
+                color: {palette.text};
+                font-size: 16px;
+                font-weight: 750;
+            }}
+            #failureGroupTitle {{
+                color: {palette.text};
+                font-weight: 750;
             }}
             QPushButton {{
                 background: {button_bg};
