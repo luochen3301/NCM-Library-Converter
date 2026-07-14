@@ -3,11 +3,11 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
       - codex/**
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   test:
@@ -28,28 +28,11 @@ jobs:
       - name: Run service tests
         run: python -m unittest discover -s tests
 
-      - name: Syntax check
-        shell: pwsh
-        run: |
-          @'
-          from pathlib import Path
+      - name: Check installed dependencies
+        run: python -m pip check
 
-          files = [
-              "gui.py",
-              "web.py",
-              "ncmdump/core.py",
-              "ncmdump/__init__.py",
-              "ncmdump/models.py",
-              "ncmdump/i18n.py",
-              "ncmdump/library_db.py",
-              "ncmdump/library_scanner.py",
-              "ncmdump/conversion_queue.py",
-          ]
-          for name in files:
-              source = Path(name).read_text(encoding="utf-8")
-              compile(source, name, "exec")
-          print("syntax ok")
-          '@ | python -
+      - name: Syntax check
+        run: python -m compileall -q gui.py web.py ncmdump scripts tests
 
   docker:
     runs-on: ubuntu-latest

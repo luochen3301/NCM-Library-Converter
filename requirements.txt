@@ -1,8 +1,11 @@
 mutagen
 pycryptodome
+soundfile>=0.13,<1
+lameenc>=1.8,<2
 
 # gui
 PyQt6
+qtawesome
 pyinstaller
 
 # web

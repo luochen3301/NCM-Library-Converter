@@ -10,6 +10,7 @@ fix by kuon 2025-01-01
 import binascii, struct
 import base64, json
 import os
+import tempfile
 import time
 
 from Crypto.Cipher import AES
@@ -48,6 +49,45 @@ class NCMFileIOError(NCMError):
 class NCMTaggingError(NCMError):
     """音频文件标签处理错误"""
     pass
+
+
+class NCMConversionCanceled(NCMError):
+    """Raised when a conversion is canceled by the caller.
+
+    Cancellation is deliberately separate from conversion failures so callers
+    can leave database state and history untouched.
+    """
+
+    pass
+
+
+def is_valid_audio_output(path, expected_format=None):
+    """Return whether *path* is a non-empty MP3/FLAC file of the expected type.
+
+    This intentionally performs a small signature check instead of accepting
+    any non-empty file.  A stale or partial file must never be treated as a
+    completed conversion merely because it has an audio-looking extension.
+    """
+
+    try:
+        output = os.fspath(path)
+        if not os.path.isfile(output) or os.path.getsize(output) <= 0:
+            return False
+
+        extension = os.path.splitext(output)[1].lower().lstrip(".")
+        expected = str(expected_format or extension).lower().lstrip(".")
+        if expected not in {"mp3", "flac"} or extension != expected:
+            return False
+
+        with open(output, "rb") as handle:
+            header = handle.read(4096)
+        if expected == "flac":
+            return header.startswith(b"fLaC")
+        if header.startswith(b"ID3"):
+            return True
+        return len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
+    except (OSError, TypeError, ValueError):
+        return False
 
 def generate_rc4_keystream(key_data):
     """生成RC4密钥流
@@ -150,7 +190,177 @@ def read_ncm_file(f):
     except Exception as e:
         raise NCMDecryptError(f"读取NCM文件时发生未知错误: {str(e)}")
 
+def _raise_if_canceled(cancel_callback):
+    if cancel_callback and cancel_callback():
+        raise NCMConversionCanceled("Conversion canceled")
+
+
+def _wait_until_resumed(pause_callback, cancel_callback):
+    while pause_callback and pause_callback():
+        _raise_if_canceled(cancel_callback)
+        time.sleep(0.1)
+    _raise_if_canceled(cancel_callback)
+
+
+def _write_media_tags(path, meta_data, image_data, identifier):
+    media_format = str(meta_data.get("format") or "").lower().lstrip(".")
+
+    def embed(item, content, picture_type):
+        item.encoding = 0
+        item.type = picture_type
+        item.mime = "image/png" if content[:4] == binascii.a2b_hex("89504E47") else "image/jpeg"
+        item.data = content
+
+    try:
+        if image_data:
+            if media_format == "flac":
+                picture_audio = flac.FLAC(path)
+                image = flac.Picture()
+                embed(image, image_data, 3)
+                picture_audio.clear_pictures()
+                picture_audio.add_picture(image)
+            else:
+                picture_audio = mp3.MP3(path)
+                if picture_audio.tags is None:
+                    picture_audio.add_tags()
+                image = id3.APIC()
+                embed(image, image_data, 6)
+                picture_audio.tags.add(image)
+            picture_audio.save()
+
+        if media_format == "flac":
+            audio = flac.FLAC(path)
+            audio["description"] = identifier
+        else:
+            audio = mp3.EasyMP3(path)
+            if audio.tags is None:
+                audio.add_tags()
+            audio.tags.RegisterTextKey("comment", "COMM")
+            audio["comment"] = identifier
+
+        audio["title"] = meta_data.get("musicName", "Unknown track")
+        audio["album"] = meta_data.get("album", "Unknown album")
+        artist_list = meta_data.get("artist", [])
+        artists = [
+            artist[0]
+            for artist in artist_list
+            if isinstance(artist, (list, tuple)) and artist and artist[0]
+        ] if isinstance(artist_list, list) else []
+        audio["artist"] = "/".join(artists) if artists else "Unknown artist"
+        audio.save()
+    except NCMError:
+        raise
+    except (mutagen.MutagenError, KeyError, TypeError, ValueError) as exc:
+        raise NCMTaggingError(f"Could not write audio metadata: {exc}") from exc
+
+
 def dump(
+    input_path,
+    output_path=None,
+    skip=True,
+    progress_callback=None,
+    pause_callback=None,
+    cancel_callback=None,
+):
+    """Decrypt one NCM file and atomically publish the resulting audio file.
+
+    The public return value remains the final output path. Audio bytes and
+    metadata are written to a same-directory temporary file whose suffix still
+    identifies the real media format. The destination is replaced only after
+    metadata writing succeeds, so cancellation and failure never leave a
+    partial final file behind.
+    """
+
+    input_path = os.fspath(input_path)
+    output_path_generator = output_path
+    if output_path_generator is None:
+        output_path_generator = lambda path, meta: os.path.splitext(path)[0] + "." + meta["format"]
+    elif not callable(output_path_generator):
+        requested_path = os.fspath(output_path_generator)
+        output_path_generator = lambda _path, _meta: requested_path
+
+    temporary_path = ""
+    try:
+        _raise_if_canceled(cancel_callback)
+        with open(input_path, "rb") as source:
+            key_stream, meta_data, image_data, identifier = read_ncm_file(source)
+            media_format = str(meta_data.get("format") or "").lower().lstrip(".")
+            if media_format not in {"mp3", "flac"}:
+                raise NCMMetadataError(f"Unsupported audio format: {media_format or 'unknown'}")
+
+            final_path = os.path.abspath(os.fspath(output_path_generator(input_path, meta_data)))
+            if os.path.splitext(final_path)[1].lower() != f".{media_format}":
+                raise NCMMetadataError(
+                    f"Output suffix must match the decrypted {media_format.upper()} audio format."
+                )
+
+            _raise_if_canceled(cancel_callback)
+            if skip and is_valid_audio_output(final_path, media_format):
+                size = os.path.getsize(final_path)
+                if progress_callback:
+                    progress_callback(size, size, final_path)
+                return final_path
+
+            output_directory = os.path.dirname(final_path)
+            os.makedirs(output_directory, exist_ok=True)
+            descriptor, temporary_path = tempfile.mkstemp(
+                prefix=f".{os.path.splitext(os.path.basename(final_path))[0]}.ncmdump-",
+                suffix=f".{media_format}",
+                dir=output_directory,
+            )
+            os.close(descriptor)
+
+            total_bytes = max(0, os.fstat(source.fileno()).st_size - source.tell())
+            written_bytes = 0
+            try:
+                with open(temporary_path, "wb") as output:
+                    while True:
+                        _wait_until_resumed(pause_callback, cancel_callback)
+                        data = source.read(BUFFER_SIZE)
+                        if not data:
+                            break
+                        output.write(strxor(data, key_stream[:len(data)]))
+                        written_bytes += len(data)
+                        if progress_callback:
+                            progress_callback(written_bytes, total_bytes, final_path)
+                    output.flush()
+                    os.fsync(output.fileno())
+            except NCMConversionCanceled:
+                raise
+            except OSError as exc:
+                raise NCMFileIOError(f"Could not write decrypted audio: {exc}") from exc
+
+            _raise_if_canceled(cancel_callback)
+            _write_media_tags(temporary_path, meta_data, image_data, identifier)
+            _raise_if_canceled(cancel_callback)
+
+            try:
+                os.replace(temporary_path, final_path)
+                temporary_path = ""
+            except OSError as exc:
+                raise NCMFileIOError(f"Could not publish converted audio: {exc}") from exc
+            return final_path
+    except NCMConversionCanceled:
+        raise
+    except (NCMFormatError, NCMDecryptError, NCMMetadataError, NCMFileIOError, NCMTaggingError):
+        raise
+    except OSError as exc:
+        raise NCMFileIOError(f"Could not open or process '{input_path}': {exc}") from exc
+    except Exception as exc:
+        raise NCMError(f"Unexpected NCM conversion error: {exc}") from exc
+    finally:
+        if temporary_path:
+            try:
+                os.remove(temporary_path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                # The final destination remains safe even if an external lock
+                # prevents immediate cleanup of the private temporary file.
+                pass
+
+
+def _legacy_dump(
     input_path,
     output_path=None,
     skip=True,

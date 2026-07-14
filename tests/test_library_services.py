@@ -80,12 +80,12 @@ class LibraryServiceTests(unittest.TestCase):
             loaded = db.get_settings()
             self.assertEqual(loaded.language, "system")
 
-    def test_theme_setting_accepts_obsidian_and_preserves_legacy_themes(self):
-        self.assertEqual(AppSettings.from_mapping({}).theme, "obsidian")
-        self.assertEqual(AppSettings.from_mapping({"theme": "obsidian"}).theme, "obsidian")
+    def test_theme_setting_maps_legacy_dark_values_to_v3_dark(self):
+        self.assertEqual(AppSettings.from_mapping({}).theme, "dark")
+        self.assertEqual(AppSettings.from_mapping({"theme": "obsidian"}).theme, "dark")
         self.assertEqual(AppSettings.from_mapping({"theme": "dark"}).theme, "dark")
         self.assertEqual(AppSettings.from_mapping({"theme": "light"}).theme, "light")
-        self.assertEqual(AppSettings.from_mapping({"theme": "neon"}).theme, "obsidian")
+        self.assertEqual(AppSettings.from_mapping({"theme": "neon"}).theme, "dark")
 
     def test_language_classifier_detects_common_filename_scripts(self):
         cases = {
@@ -155,7 +155,7 @@ class LibraryServiceTests(unittest.TestCase):
             root = Path(tmp) / "music"
             root.mkdir()
             (root / "converted.ncm").write_bytes(b"source")
-            (root / "converted.flac").write_bytes(b"output")
+            (root / "converted.flac").write_bytes(b"fLaC" + b"\x00" * 64)
             (root / "pending.ncm").write_bytes(b"source")
             (root / "normal.mp3").write_bytes(b"audio")
             ignored = root / "node_modules"
@@ -227,7 +227,7 @@ class LibraryServiceTests(unittest.TestCase):
             root.mkdir()
             (root / "track.ncm").write_bytes(b"source")
             output = root / "track.flac"
-            output.write_bytes(b"output")
+            output.write_bytes(b"fLaC" + b"\x00" * 64)
             db = LibraryDB(str(Path(tmp) / "state.sqlite3"))
             settings = AppSettings(music_library_path=str(root))
             scan_library(db, str(root), settings)
@@ -316,7 +316,7 @@ class LibraryServiceTests(unittest.TestCase):
 
             def fake_dump(input_path, output_path=None, skip=True, **kwargs):
                 target = output_path(input_path, {"format": "flac"})
-                Path(target).write_bytes(b"converted")
+                Path(target).write_bytes(b"fLaC" + b"\x00" * 64)
                 progress = kwargs.get("progress_callback")
                 if progress:
                     progress(1, 1, target)
@@ -357,7 +357,7 @@ class LibraryServiceTests(unittest.TestCase):
 
             def successful_dump(input_path, output_path=None, skip=True, **kwargs):
                 target = output_path(input_path, {"format": "flac"})
-                Path(target).write_bytes(b"converted")
+                Path(target).write_bytes(b"fLaC" + b"\x00" * 64)
                 return target
 
             progress = ConversionQueue(db, dump_func=successful_dump).run_pending(library_id, str(root), settings)

@@ -29,7 +29,7 @@
     <path d="M316 70H344V650H316V70Z" fill="#10192B"/>
     <circle cx="124" cy="123" r="19" fill="#35C2A4"/>
     <text x="158" y="117" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="700">NCM Library</text>
-    <text x="158" y="143" fill="#8EA3B8" font-family="Segoe UI, Arial, sans-serif" font-size="14">Converter V2.2</text>
+    <text x="158" y="143" fill="#8EA3B8" font-family="Segoe UI, Arial, sans-serif" font-size="14">Converter V3.0</text>
     <rect x="104" y="190" width="176" height="42" rx="10" fill="#132138"/>
     <text x="132" y="217" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="16">音乐库</text>
     <rect x="104" y="247" width="176" height="42" rx="10" fill="#0A0F1D"/>

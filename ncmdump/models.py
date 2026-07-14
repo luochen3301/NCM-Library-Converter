@@ -19,6 +19,16 @@ class FileStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
+class TaskState(str, Enum):
+    IDLE = "idle"
+    SCANNING = "scanning"
+    CONVERTING = "converting"
+    TRANSCODING = "transcoding"
+    PAUSED = "paused"
+    CANCELING = "canceling"
+    CLOSING = "closing"
+
+
 NORMAL_AUDIO_EXTENSIONS = {".flac", ".mp3", ".wav", ".m4a", ".aac", ".ogg"}
 NCM_EXTENSION = ".ncm"
 AUDIO_EXTENSIONS = NORMAL_AUDIO_EXTENSIONS | {NCM_EXTENSION}
@@ -54,9 +64,14 @@ class AppSettings:
     max_concurrent_conversions: int = 2
     strict_verification: bool = False
     ignored_folder_rules: list[str] = field(default_factory=lambda: list(DEFAULT_IGNORED_FOLDERS))
-    theme: str = "obsidian"
+    theme: str = "dark"
     density: str = "comfortable"
     language: str = "system"
+    flac_mp3_bitrate: int = 320
+    flac_mp3_output_location: str = "same_folder"
+    flac_mp3_output_folder: str = ""
+    flac_mp3_preserve_structure: bool = True
+    flac_mp3_skip_existing: bool = True
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any] | None) -> "AppSettings":
@@ -82,8 +97,18 @@ class AppSettings:
             settings.density = "comfortable"
         if settings.language not in {"system", "en", "zh_CN"}:
             settings.language = "system"
-        if settings.theme not in {"obsidian", "dark", "light"}:
-            settings.theme = "obsidian"
+        if settings.theme in {"obsidian", "dark"}:
+            settings.theme = "dark"
+        elif settings.theme != "light":
+            settings.theme = "dark"
+        try:
+            settings.flac_mp3_bitrate = int(settings.flac_mp3_bitrate)
+        except (TypeError, ValueError):
+            settings.flac_mp3_bitrate = 320
+        if settings.flac_mp3_bitrate not in {128, 192, 256, 320}:
+            settings.flac_mp3_bitrate = 320
+        if settings.flac_mp3_output_location not in {"same_folder", "custom_folder"}:
+            settings.flac_mp3_output_location = "same_folder"
         return settings
 
     def to_json(self) -> str:
@@ -107,6 +132,7 @@ class FileRecord:
     last_scan_at: str = ""
     last_seen_at: str = ""
     ignored: bool = False
+    source_deleted: bool = False
 
     @classmethod
     def from_row(cls, row: Any) -> "FileRecord":
@@ -126,6 +152,7 @@ class FileRecord:
             last_scan_at=row["last_scan_at"] or "",
             last_seen_at=row["last_seen_at"] or "",
             ignored=bool(row["ignored"]),
+            source_deleted=bool(row["source_deleted"]) if "source_deleted" in row.keys() else False,
         )
 
 
@@ -149,16 +176,81 @@ class ScanProgress:
 
 
 @dataclass
+class ActiveConversion:
+    file_id: int | None = None
+    relative_path: str = ""
+    written: int = 0
+    total: int = 0
+    percent: float = 0.0
+    status: str = "converting"
+
+
+@dataclass(init=False)
 class QueueProgress:
+    sequence: int = 0
     total: int = 0
     current_file: str = ""
     current_index: int = 0
-    success: int = 0
+    state: TaskState = TaskState.IDLE
+    completed: int = 0
+    converted: int = 0
+    skipped: int = 0
     failed: int = 0
+    not_processed: int = 0
     remaining: int = 0
+    overall_percent: float = 0.0
+    active_items: list[ActiveConversion] = field(default_factory=list)
     paused: bool = False
     canceled: bool = False
     message: str = ""
+
+    def __init__(
+        self,
+        total: int = 0,
+        current_file: str = "",
+        current_index: int = 0,
+        success: int | None = None,
+        failed: int = 0,
+        remaining: int = 0,
+        paused: bool = False,
+        canceled: bool = False,
+        message: str = "",
+        *,
+        sequence: int = 0,
+        state: TaskState | str = TaskState.IDLE,
+        completed: int = 0,
+        converted: int = 0,
+        skipped: int = 0,
+        not_processed: int = 0,
+        overall_percent: float = 0.0,
+        active_items: list[ActiveConversion] | None = None,
+    ) -> None:
+        self.sequence = int(sequence)
+        self.total = int(total)
+        self.current_file = current_file
+        self.current_index = int(current_index)
+        self.state = TaskState(state)
+        self.completed = int(completed)
+        self.converted = int(converted if success is None else success)
+        self.skipped = int(skipped)
+        self.failed = int(failed)
+        self.not_processed = int(not_processed)
+        self.remaining = int(remaining)
+        self.overall_percent = float(overall_percent)
+        self.active_items = list(active_items or [])
+        self.paused = bool(paused)
+        self.canceled = bool(canceled)
+        self.message = message
+
+    @property
+    def success(self) -> int:
+        """Compatibility alias for the pre-V3 successful-conversion counter."""
+
+        return self.converted
+
+    @success.setter
+    def success(self, value: int) -> None:
+        self.converted = int(value)
 
 
 def normalize_relative_path(path: str | os.PathLike[str]) -> str:

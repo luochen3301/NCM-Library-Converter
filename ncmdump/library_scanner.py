@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from .core import is_valid_audio_output
 from .library_db import LibraryDB, utc_now
 from .models import (
     AUDIO_EXTENSIONS,
@@ -17,7 +18,6 @@ from .models import (
     ScanProgress,
     candidate_output_paths,
     compute_fingerprint,
-    is_reasonable_output,
     normalize_relative_path,
 )
 
@@ -64,15 +64,12 @@ def scan_library(
         raise NotADirectoryError(f"Music library path is not a folder: {library_path}")
 
     library_id = db.set_selected_library(str(root))
-    if scan_mode == "full":
-        db.clear_library_files(library_id)
-        existing_records: dict[str, FileRecord] = {}
-    else:
-        existing_records = db.files_by_relative_path(library_id)
+    existing_records = db.files_by_relative_path(library_id)
 
     scan_started_at = utc_now()
     progress = ScanProgress(mode=scan_mode)
     seen_relative_paths: set[str] = set()
+    snapshot_records: list[FileRecord] = []
     db.add_log("INFO", "scan", f"Started {scan_mode} scanning {root}")
 
     def handle_file(file_path: Path) -> None:
@@ -122,6 +119,7 @@ def scan_library(
                     or existing.failure_reason != failure_reason
                     or existing.absolute_path != str(file_path)
                     or existing.extension != extension
+                    or existing.source_deleted
                 ):
                     record = FileRecord(
                         id=existing.id,
@@ -139,8 +137,9 @@ def scan_library(
                         last_scan_at=scan_started_at,
                         last_seen_at=scan_started_at,
                         ignored=ignored,
+                        source_deleted=False,
                     )
-                    db.upsert_file(record)
+                    snapshot_records.append(record)
                     progress.updated += 1
                 else:
                     progress.unchanged += 1
@@ -183,8 +182,9 @@ def scan_library(
                 last_scan_at=scan_started_at,
                 last_seen_at=scan_started_at,
                 ignored=ignored,
+                source_deleted=False,
             )
-            db.upsert_file(record)
+            snapshot_records.append(record)
             if existing:
                 progress.updated += 1
             else:
@@ -192,43 +192,64 @@ def scan_library(
             _increment_progress_status(progress, status)
         except OSError as exc:
             db.add_log("ERROR", "scan", f"Could not scan {file_path}: {exc}")
+            raise
         _emit(progress_callback, progress)
 
-    if settings.recursive_scan:
-        for current_root, dirs, files in os.walk(root):
-            if cancel_event and cancel_event.is_set():
-                progress.canceled = True
-                break
-            dirs[:] = [
-                directory
-                for directory in dirs
-                if not should_ignore_dir(Path(current_root) / directory, settings.ignored_folder_rules)
-            ]
-            for filename in files:
-                handle_file(Path(current_root) / filename)
-                if progress.canceled:
-                    break
-            if progress.canceled:
-                break
-    else:
-        with os.scandir(root) as entries:
-            for entry in entries:
+    try:
+        if settings.recursive_scan:
+            def raise_walk_error(error: OSError) -> None:
+                raise error
+
+            for current_root, dirs, files in os.walk(root, onerror=raise_walk_error):
                 if cancel_event and cancel_event.is_set():
                     progress.canceled = True
                     break
-                if entry.is_file():
-                    handle_file(Path(entry.path))
+                dirs[:] = [
+                    directory
+                    for directory in dirs
+                    if not should_ignore_dir(Path(current_root) / directory, settings.ignored_folder_rules)
+                ]
+                for filename in files:
+                    handle_file(Path(current_root) / filename)
+                    if progress.canceled:
+                        break
+                if progress.canceled:
+                    break
+        else:
+            with os.scandir(root) as entries:
+                for entry in entries:
+                    if cancel_event and cancel_event.is_set():
+                        progress.canceled = True
+                        break
+                    if entry.is_file():
+                        handle_file(Path(entry.path))
+    except BaseException as exc:
+        db.add_log("ERROR", "scan", f"Aborted {scan_mode} scanning {root}: {exc}")
+        raise
 
-    if not progress.canceled:
-        if scan_mode == "incremental":
-            progress.missing += db.mark_missing_except(library_id, seen_relative_paths, scan_started_at)
-        db.update_library_scan_time(library_id, scan_started_at)
-        duplicates = db.duplicate_warnings(library_id)
-        if duplicates:
-            db.add_log("WARNING", "scan", f"Possible duplicate files detected: {len(duplicates)} groups")
-        db.add_log("INFO", "scan", f"Finished {scan_mode} scanning {root}")
-    else:
+    if cancel_event and cancel_event.is_set():
+        progress.canceled = True
+    if progress.canceled:
         db.add_log("WARNING", "scan", f"Canceled {scan_mode} scanning {root}")
+        _emit(progress_callback, progress)
+        return progress
+
+    try:
+        committed = db.commit_scan_snapshot(
+            library_id,
+            snapshot_records,
+            seen_relative_paths,
+            scan_started_at,
+            scan_mode,
+        )
+    except BaseException as exc:
+        db.add_log("ERROR", "scan", f"Could not commit {scan_mode} scan for {root}: {exc}")
+        raise
+    progress.missing += committed.missing
+    duplicates = db.duplicate_warnings(library_id)
+    if duplicates:
+        db.add_log("WARNING", "scan", f"Possible duplicate files detected: {len(duplicates)} groups")
+    db.add_log("INFO", "scan", f"Finished {scan_mode} scanning {root}")
     _emit(progress_callback, progress)
     return progress
 
@@ -292,7 +313,7 @@ def _detect_output_path(
 ) -> str:
     known_output_path = existing.output_path if existing else ""
     for candidate in candidate_output_paths(file_path, root, settings, known_output_path):
-        if is_reasonable_output(candidate):
+        if is_valid_audio_output(candidate):
             return candidate
     return ""
 
