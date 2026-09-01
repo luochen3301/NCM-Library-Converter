@@ -107,34 +107,36 @@ class LibraryServiceTests(unittest.TestCase):
         self.assertIn("2", Translator("zh_CN").t("queue.summary", pending=2, failed=1))
 
     def test_file_table_checked_ids_survive_visible_record_changes(self):
-        from gui import FileTableModel
+        from ncmdump.ui.qml_models import LibraryTableModel
 
         first = make_ui_record(1, "first.ncm")
         second = make_ui_record(2, "second.ncm")
-        model = FileTableModel([first, second])
+        model = LibraryTableModel()
+        model.set_records([first, second])
 
-        model.toggle_row_checked(0, True)
-        self.assertEqual([record.id for record in model.checked_records()], [1])
+        model.toggleChecked(0)
+        self.assertEqual(model.checked_ids, {1})
 
         model.set_records([second])
-        self.assertEqual(model.checked_records(), [])
+        self.assertEqual(model.records_for_ids(model.checked_ids), [])
 
         model.set_records([first])
-        self.assertEqual([record.id for record in model.checked_records()], [1])
+        self.assertEqual([record.id for record in model.records_for_ids(model.checked_ids)], [1])
 
     def test_file_table_toggle_row_checked_can_uncheck_same_row(self):
-        from gui import FileTableModel
+        from ncmdump.ui.qml_models import LibraryTableModel
 
-        model = FileTableModel([make_ui_record(1, "first.ncm")])
+        model = LibraryTableModel()
+        model.set_records([make_ui_record(1, "first.ncm")])
 
-        model.toggle_row_checked(0)
-        self.assertEqual([record.id for record in model.checked_records()], [1])
+        model.toggleChecked(0)
+        self.assertEqual(model.checked_ids, {1})
 
-        model.toggle_row_checked(0)
-        self.assertEqual(model.checked_records(), [])
+        model.toggleChecked(0)
+        self.assertEqual(model.checked_ids, set())
 
     def test_failure_group_key_classifies_common_errors(self):
-        from gui import MainWindow
+        from ncmdump.ui.bridge import _failure_group_key
 
         cases = {
             "No permission to read the source or write the output file.": "permission",
@@ -148,7 +150,7 @@ class LibraryServiceTests(unittest.TestCase):
         }
         for message, expected in cases.items():
             with self.subTest(message=message):
-                self.assertEqual(MainWindow._failure_group_key(None, message), expected)
+                self.assertEqual(_failure_group_key(message), expected)
 
     def test_scan_statuses_ignore_and_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

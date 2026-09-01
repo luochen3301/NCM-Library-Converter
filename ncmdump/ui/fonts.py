@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from PyQt6.QtGui import QFont, QFontDatabase
+from PySide6.QtGui import QFont, QFontDatabase
 
 
 _APPLICATION_FONT_IDS: list[int] = []
@@ -39,6 +39,7 @@ def install_ui_font(point_size: int = 10) -> QFont:
     """
 
     preferred = (
+        "Segoe UI Variable",
         "Microsoft YaHei UI",
         "Microsoft YaHei",
         "PingFang SC",
@@ -48,7 +49,7 @@ def install_ui_font(point_size: int = 10) -> QFont:
         "Arial",
     )
     families = set(QFontDatabase.families())
-    if not any(family in families for family in preferred[:5]):
+    if not any(family in families for family in preferred[:6]):
         for path in _platform_font_files():
             if not path.is_file():
                 continue
@@ -56,11 +57,12 @@ def install_ui_font(point_size: int = 10) -> QFont:
             if font_id >= 0:
                 _APPLICATION_FONT_IDS.append(font_id)
                 families.update(QFontDatabase.applicationFontFamilies(font_id))
-                if any(family in families for family in preferred[:5]):
+                if any(family in families for family in preferred[:6]):
                     break
 
     family = next((candidate for candidate in preferred if candidate in families), "Segoe UI")
     font = QFont(family, point_size)
+    font.setFamilies(list(preferred))
     font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
     return font
 

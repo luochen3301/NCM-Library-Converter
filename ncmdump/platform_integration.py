@@ -181,8 +181,8 @@ def _show_item_with_file_manager1(target: Path) -> bool:
 
 def _open_with_qdesktopservices(folder: Path) -> bool:
     try:
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
 
         return bool(QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder))))
     except (ImportError, RuntimeError):
